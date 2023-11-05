@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>circles</title>
+  <style>
+    body, html {
+      padding: 0px;
+      margin: 0px;
+      width: 100%;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+      background: gray;
+    }
+     .overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .overlay input[type="number"] {
+      display: inline-block;
+      border: none;
+      font-size: 2em;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.4);
+      border-radius: 0.5em;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <input type="number" min = "1", max = "5000" placeholder="количество шаров">
+  </div>
+  <canvas></canvas>
+  <script>
+
+    const canvas = document.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.width = window.innerWidth;
+    const ch = canvas.height = window.innerHeight;
+    
+    const FPS = 100; // выше 125 работает нестабильно
+    let fpsCorrection = 0; // для коррекции FPS
+    const input = document.querySelector("input");
+    let bArr = []; 
+    let bCount = input.value = 50;
+    input.placeholder = input.value;
+    input.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+    const sizeCoef = (()=> {
+      let value = 0;
+      for (let i = 5; i < 500000; i *= 10) {
+        if (bCount >= i) value += 0.5;
+      }
+      return value;
+    });
+    let maxR = (cw < ch ? cw : ch) / 2 / bCount;
+    maxR = maxR + maxR * sizeCoef();
+    let minR = maxR * 0.15;
+    let midS = (cw + ch) / 2 / (maxR - minR) / bCount;
+    let id, x, y, r
+    
+    function setBallCount(count) {
+      bCount = count;
+      maxR = (cw < ch ? cw : ch) / 2 / bCount;
+      maxR = maxR + maxR * sizeCoef();
+      minR = maxR * 0.15;
+      midS = (cw + ch) / 2 / (maxR - minR) / bCount;
+      respawnBalls(); 
+    }
+    
+    class Ball {
+      id = 0;
+      r = rndInt(minR, maxR); // радиус 
+      x = rndInt(this.r, cw - this.r);
+      y = rndInt(this.r, ch - this.r);
+      ws = rndInt(0, 1) ? 1 : -1;
+      hs = rndInt(0, 1) ? 1 : -1;
+      s = midS * (1 - norm(this.r, minR, maxR)) + midS * 0.25;
+      c = Math.floor(Math.random() * 0xFFFFFF).toString(16);
+      isBallColl = false; // флаг столкновение с другим шаром
+      
+      setXY() {
+        while(1) {
+          let isCollision = false;
+          bArr.forEach(function (e) {
+            if (id != e.id) {
+              if (((Math.sqrt((x - e.x) ** 2 + (y - e.y) ** 2)) - Math.abs((r + e.r))) <= 0) {
+                isCollision = true;
+              }
+            }
+          });
+          if (isCollision) {
+            this.x = rndInt(this.r, cw - this.r);
+            this.y = rndInt(this.r, cw - this.r);
+            x = this.x;
+            y = this.y;
+          }
+          else break;
+        }
+      }
+      
+      collisionWithWall() { // отталкивание от стен
+        if (this.x + this.r > cw) this.ws = -1;
+        else if (this.x < this.r) this.ws = 1;
+        if (this.y + this.r > ch) this.hs = -1;
+        else if (this.y < this.r) this.hs = 1;
+      }
+      collisionWithCircle(b) { // отталкивание от других шаров 
+        b.isBallColl = false;
+        bArr.forEach(function (_b) {
+          if (b != _b && b.isBallColl != true) {
+            b.isBallColl = ((Math.sqrt((b.x - _b.x) ** 2 + (b.y - _b.y) ** 2)) - Math.abs((b.r + _b.r))) <= 0;
+            if (b.isBallColl) {
+              let dir = rndInt(1, 3);
+              if (b.x < _b.x && (dir == 1 || dir == 3)) b.ws = -1;
+              else if (b.x > _b.x && (dir == 1 || dir == 3)) b.ws = 1;
+              if (b.y < _b.y && (dir == 2 || dir == 3)) b.hs = -1;
+              else if (b.y > _b.y && (dir == 2 || dir == 3)) b.hs = 1;
+            }
+          }
+        });
+      }
+      
+      move() { // перемещение
+        this.x += this.s * this.ws;
+        this.y += this.s * this.hs;
+      }
+    };
+   
+    function respawnBalls() {
+      bArr = [];
+      for (let i = 0; i < bCount; i++) {
+        bArr[i] = new Ball;
+        bArr[i].id = i;
+        id = i;
+        x = bArr[i].x;
+        y = bArr[i].y;
+        r = bArr[i].r;
+        bArr[i].setXY();
+      }
+      bArr.sort((a, b) => a.r > b.r ? 1 : -1); // сортировка по возрастанию величины радиуса 
+    }
+    
+    respawnBalls(); 
+    arrMidCurrentFPS = new Array(10);
+    let lastTime = new Date();
+    function loop() { 
+        let currentTime = new Date();
+        let _fps = 1000 / (currentTime - lastTime);
+        if (currentTime - lastTime > 1000 / (FPS + fpsCorrection)) {
+          lastTime = currentTime;
+          arrMidCurrentFPS = arrMidCurrentFPS.slice(1,arrMidCurrentFPS.lenth);
+          arrMidCurrentFPS.push(_fps);
+          sumFPS = 0;
+          arrMidCurrentFPS.forEach(function (e) {
+            sumFPS += e;
+          });
+          let step = Math.abs(sumFPS/10 - FPS) < 2 ? 0.01 : 1;
+          fpsCorrection += (sumFPS/10 > FPS) ? -step : step;
+          //console.log(sumFPS/10);
+          animation();
+        }
+        requestAnimationFrame(loop);
+    }
+    loop();
+
+    function animation() {
+      // очищаем холст
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      bArr.forEach(function(b) {
+        b.collisionWithWall();
+        b.collisionWithCircle(b);
+        b.move();
+        // отрисовка
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, 2 * Math.PI);
+        ctx.stroke()
+        
+        if (b.isBallColl) {
+          ctx.fillStyle = `#${b.c}1f`;
+        }
+        else {
+          ctx.fillStyle = `#${b.c}3f`;
+        }
+        ctx.fill();
+      });
+    }
+    
+    function rndInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    function norm(x, min, max) {
+      return (x - min) / (max - min)
+    }
+    
+    input.addEventListener("change", (e) => {
+      let val = parseInt(input.value);
+      if (Number.isNaN(val)) val = input.value = input.placeholder;
+      if (val < parseInt(input.min) || val > parseInt(input.max)) {
+        input.style.backgroundColor = "rgba(255, 0, 0, 0.3)";
+      }
+      else {
+        input.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+        input.placeholder = val;
+        setBallCount(val);
+      }
+      
+    });
+
+  </script>
+</body>
+</html>
