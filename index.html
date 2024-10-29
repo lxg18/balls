@@ -15,7 +15,7 @@
       display: block;
       background: gray;
     }
-     .overlay {
+    .overlay {
       position: absolute;
       top: 50%;
       left: 50%;
@@ -45,6 +45,8 @@
     
     const FPS = 100; // выше 125 работает нестабильно
     let fpsCorrection = 0; // для коррекции FPS
+    const isGlareEnable = 1; // включение бликов
+    const glare = {pos:0.15, size:0.6}; // смещение от центра и размер относительно радиуса сферы 
     const input = document.querySelector("input");
     let bArr = []; 
     let bCount = input.value = 50;
@@ -130,7 +132,7 @@
         this.y += this.s * this.hs;
       }
     };
-   
+    
     function respawnBalls() {
       bArr = [];
       for (let i = 0; i < bCount; i++) {
@@ -187,6 +189,13 @@
           ctx.fillStyle = `#${b.c}3f`;
         }
         ctx.fill();
+        // блик
+        if (isGlareEnable) {
+          ctx.beginPath();
+          ctx.arc(b.x-b.r*glare.pos, b.y+b.r*glare.pos, b.r*glare.size, 0, 2 * Math.PI);
+          ctx.fillStyle = `#ffffff1f`;
+          ctx.fill();
+        }        
       });
     }
     
